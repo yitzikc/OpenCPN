@@ -1434,7 +1434,11 @@ static bool read_header_and_populate_cib ( FILE *stream, Cell_Info_Block *pCIB )
       pCIB->m_nvector_records = header.usn_vector_records;
       pCIB->edge_vector_descriptor_block = ( geometry_descriptor * ) malloc ( header.usn_vector_records * sizeof ( geometry_descriptor ) );
 
+      assert(header.n_vector_record_points >= 0);
       pCIB->pvector_record_block_top = ( cm93_point * ) calloc ( header.n_vector_record_points, sizeof ( cm93_point ) );
+      if (header.n_vector_record_points > 0) {
+            memcpy(pCIB->pvector_record_block_top, &(header.n_vector_record_points), sizeof(header.n_vector_record_points));
+      }
 
       pCIB->m_n_point3d_records = header.usn_point3d_records;
       pCIB->point3d_descriptor_block = ( geometry_descriptor * ) malloc ( pCIB->m_n_point3d_records * sizeof ( geometry_descriptor ) );
@@ -1450,6 +1454,9 @@ static bool read_vector_record_table ( FILE *stream, int count, Cell_Info_Block 
 
       geometry_descriptor *p = pCIB->edge_vector_descriptor_block;
       cm93_point *q = pCIB->pvector_record_block_top;
+      int n_allocated_points = 0;
+      memcpy(&n_allocated_points, q, sizeof(n_allocated_points));
+      memset(q, 0, sizeof(n_allocated_points));
 
       for ( int iedge=0 ; iedge < count ; iedge++ )
       {
@@ -1464,8 +1471,10 @@ static bool read_vector_record_table ( FILE *stream, int count, Cell_Info_Block 
             p->n_points = npoints;
             p->p_points = q;
           
-            if (npoints >= 32768) {
-                wxLogWarning("Unexpectedly high point count %d", npoints);
+            ptrdiff_t already_used = q - pCIB->pvector_record_block_top;
+            if (npoints + already_used > n_allocated_points) {
+                wxLogWarning("About to overflow pvector_record_block_top buffer with %d points adding %d to already used %d.", n_allocated_points, int(npoints), int(already_used));
+                return false;
             }
 
 //           brv = read_and_decode_bytes(stream, q, p->n_points * sizeof(cm93_point));
