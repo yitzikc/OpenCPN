@@ -1434,7 +1434,7 @@ static bool read_header_and_populate_cib ( FILE *stream, Cell_Info_Block *pCIB )
       pCIB->m_nvector_records = header.usn_vector_records;
       pCIB->edge_vector_descriptor_block = ( geometry_descriptor * ) malloc ( header.usn_vector_records * sizeof ( geometry_descriptor ) );
 
-      pCIB->pvector_record_block_top = ( cm93_point * ) malloc ( header.n_vector_record_points * sizeof ( cm93_point ) );
+      pCIB->pvector_record_block_top = ( cm93_point * ) calloc ( header.n_vector_record_points, sizeof ( cm93_point ) );
 
       pCIB->m_n_point3d_records = header.usn_point3d_records;
       pCIB->point3d_descriptor_block = ( geometry_descriptor * ) malloc ( pCIB->m_n_point3d_records * sizeof ( geometry_descriptor ) );
@@ -1463,6 +1463,10 @@ static bool read_vector_record_table ( FILE *stream, int count, Cell_Info_Block 
 
             p->n_points = npoints;
             p->p_points = q;
+          
+            if (npoints >= 32768) {
+                wxLogWarning("Unexpectedly high point count %d", npoints);
+            }
 
 //           brv = read_and_decode_bytes(stream, q, p->n_points * sizeof(cm93_point));
 //            if(!brv)
@@ -1476,6 +1480,7 @@ static bool read_vector_record_table ( FILE *stream, int count, Cell_Info_Block 
                   if ( !read_and_decode_ushort ( stream, &y ) )
                         return false;
 
+                  assert(q[index].x == 0 && q[index].y == 0);
                   q[index].x = x;
                   q[index].y = y;
             }
